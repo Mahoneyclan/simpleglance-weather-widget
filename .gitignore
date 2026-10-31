@@ -20,3 +20,11 @@ developer_key.der
 **/.DS_Store
 .AppleDouble
 .LSOverride
+
+# Any signing key or certificate, whatever its name
+*.der
+*.pem
+*.p12
+
+# Local Claude Code settings
+.claude/settings.local.json

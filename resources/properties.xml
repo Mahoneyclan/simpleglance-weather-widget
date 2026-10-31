@@ -2,8 +2,10 @@
 <resources>
     <properties>
         <property id="refresh_rate" type="number">30</property>
-        <property id="home_lat"     type="string">-27.3705</property>
-        <property id="home_lon"     type="string">152.8691</property>
+        <!-- Blank = Home not set. Older versions shipped coordinates here;
+             HomeSettings still treats those values as "not set". -->
+        <property id="home_lat"     type="string"></property>
+        <property id="home_lon"     type="string"></property>
     </properties>
 
     <settings>

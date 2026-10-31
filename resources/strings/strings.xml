@@ -1,7 +1,11 @@
 <?xml version="1.0"?>
 <strings>
     <string id="AppName">SimpleGlance</string>
-<string id="NoLocation">Waiting for\nGPS location...</string>
-    <string id="Loading">Loading\nweather...</string>
-    <string id="GpsLocation">GPS Location</string>
-    </strings>
+    <!-- Full-screen status messages. "\n" breaks the line on the watch. -->
+    <string id="WaitingGps">Waiting for\nGPS location...</string>
+    <string id="LoadingWeather">Loading\nweather...</string>
+    <string id="NoConnection">No connection.\nPress MENU\nto retry.</string>
+    <string id="CheckHome">Check Home\nsettings in\nGarmin Connect</string>
+    <!-- Bottom status line when the shown data could not be refreshed; " · 14:05" (the data time) is appended when known. -->
+    <string id="Offline">No connection</string>
+</strings>

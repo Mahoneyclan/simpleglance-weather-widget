@@ -1,43 +1,55 @@
+// WeatherDelegate.mc — button and swipe handling for the full-screen widget.
+// Runs in the foreground (widget) process only. Changes WeatherView's page and
+// location and asks it to refresh; it does no drawing or networking itself.
+
 import Toybox.Lang;
 import Toybox.WatchUi;
 
-// Handles button input for the main weather view.
-// SELECT toggles between GPS and home location (applies to both pages).
-// UP/DOWN toggles between current conditions and forecast for the active location.
-// MENU forces an immediate data refresh.
+//! Handles input for WeatherView.
+//!
+//! - DOWN / UP cycle through the three pages: current conditions → hourly → daily.
+//! - SELECT toggles between the GPS location and the Home location (all pages).
+//! - MENU asks WeatherView to refresh its data.
 class WeatherDelegate extends WatchUi.BehaviorDelegate {
 
+    //! The view this delegate controls.
     private var view as WeatherView;
 
+    //! @param view The main weather view this delegate controls.
     function initialize(view as WeatherView) {
         BehaviorDelegate.initialize();
         self.view = view;
     }
 
-    // UP button or swipe up: advance page 0→1→2→0
+    //! Next page: 0 → 1 → 2 → 0.
+    //! Garmin maps this to the DOWN button, or a swipe up on touch screens.
+    //! @return true, because the event is always handled.
     function onNextPage() as Boolean {
-        view.pageIndex = (view.pageIndex + 1) % 3;
-        WatchUi.requestUpdate();
+        view.turnPage(1);
         return true;
     }
 
-    // DOWN button or swipe down: retreat page 0→2→1→0
+    //! Previous page: 0 → 2 → 1 → 0.
+    //! Garmin maps this to the UP button, or a swipe down on touch screens.
+    //! @return true, because the event is always handled.
     function onPreviousPage() as Boolean {
-        view.pageIndex = (view.pageIndex + 2) % 3;
-        WatchUi.requestUpdate();
+        view.turnPage(-1);
         return true;
     }
 
-    // SELECT: toggle between GPS location and home location (on either page)
+    //! SELECT: toggle between the GPS location and the Home location.
+    //! The choice applies to every page.
+    //! @return true, because the event is always handled.
     function onSelect() as Boolean {
-        view.locationIndex = view.locationIndex == 0 ? 1 : 0;
-        WatchUi.requestUpdate();
+        view.toggleLocation();
         return true;
     }
 
-    // MENU button: force an immediate weather refresh for both locations
+    //! MENU: ask WeatherView to refresh. Only locations whose data is missing or
+    //! older than the refresh interval are fetched, so this is not a forced refresh.
+    //! @return true, because the event is always handled.
     function onMenu() as Boolean {
-        view.fetchAll();
+        view.refresh();
         return true;
     }
 }
