@@ -3,9 +3,9 @@
 // and saves the answer. Runs in the foreground (widget) process only; WeatherData
 // owns it and writes new names into its weather arrays.
 //
-// Storage keys written here: gps_place, home_place.
+// Storage keys written here: gps_place, home_place. Storage and requests go
+// through WatchServices, so tests can replace them.
 
-import Toybox.Application;
 import Toybox.Lang;
 
 //! Place names by slot, and the lookups that change them.
@@ -18,10 +18,14 @@ class PlaceNames {
     private var pending as Array<Array<Numeric>> = [[0, 0], [0, 0]] as Array<Array<Numeric>>;
     //! Called with (slot, name) whenever a slot's name changes.
     private var onChange as Method(slot as Number, name as String) as Void;
+    //! Storage and requests.
+    private var watch as WatchServices;
 
+    //! @param services The watch services (a test double in unit tests).
     //! @param changed Called with (slot, name) when a slot gets a new name, so the
     //!   owner can write it into its cached arrays.
-    function initialize(changed as Method(slot as Number, name as String) as Void) {
+    function initialize(services as WatchServices, changed as Method(slot as Number, name as String) as Void) {
+        watch = services;
         onChange = changed;
     }
 
@@ -45,14 +49,14 @@ class PlaceNames {
     //! @param lon Longitude of the slot's position.
     function lookUp(slot as Number, lat as Numeric, lon as Numeric) as Void {
         var saved = FetchRules.savedPlaceName(lat, lon,
-            Storage.getValue(WeatherState.PLACE_KEYS[slot] as String));
+            watch.getValue(WeatherState.PLACE_KEYS[slot] as String));
         if (saved != null) {
             if (!saved.equals(names[slot])) { change(slot, saved); }
             return;
         }
         if (slot == WeatherState.HOME) { names[slot] = WeatherParser.HOME_PLACEHOLDER; }
         pending[slot] = [lat, lon] as Array<Numeric>;
-        WeatherRequests.placeName(lat.toFloat(), lon.toFloat(),
+        watch.requestPlaceName(lat.toFloat(), lon.toFloat(),
             (slot == WeatherState.HOME) ? method(:onHomePlace) : method(:onGpsPlace));
     }
 
@@ -81,7 +85,7 @@ class PlaceNames {
         var value = (responseCode == 200) ? WeatherParser.parsePlaceName(data) : null;
         if (value == null) { return; }
         var at = pending[slot];
-        Storage.setValue(WeatherState.PLACE_KEYS[slot] as String, FetchRules.placeRecord(at[0], at[1], value));
+        watch.setValue(WeatherState.PLACE_KEYS[slot] as String, FetchRules.placeRecord(at[0], at[1], value));
         change(slot, value);
     }
 

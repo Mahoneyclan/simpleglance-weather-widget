@@ -1,5 +1,5 @@
 // WeatherIcons.mc — maps Open-Meteo WMO weather codes to bundled icon bitmaps,
-// and keeps loaded bitmaps so they are not reloaded on every redraw.
+// and keeps loaded icons and page text so they are not reloaded on every redraw.
 // Used by the full-screen widget only.
 //
 // Icon set: Met.no weathericons, sourced from BleachDev/Rainy (GPL-3.0).
@@ -9,9 +9,9 @@
 //   1/2/3    Mainly clear / partly cloudy / overcast
 //   45/48    Fog / rime fog
 //   51/53/55 Drizzle light/moderate/dense
-//   56/57    Freezing drizzle            (no mapping — shows clear sky)
+//   56/57    Freezing drizzle            (shown as light rain; no freezing icon in the set)
 //   61/63/65 Rain light/moderate/heavy
-//   66/67    Freezing rain               (no mapping — shows clear sky)
+//   66/67    Freezing rain light/heavy   (shown as rain / heavy rain)
 //   71/73/75 Snow light/moderate/heavy
 //   77       Snow grains
 //   80/81/82 Rain showers light/moderate/heavy
@@ -36,9 +36,9 @@ module WeatherIcons {
         if (code == 2)  { return isDay ? Rez.Drawables.partlycloudy_day : Rez.Drawables.partlycloudy_night; }
         if (code == 3)  { return Rez.Drawables.cloudy; }
         if (code == 45 || code == 48) { return Rez.Drawables.fog; }
-        if (code == 51 || code == 53 || code == 55 || code == 61) { return Rez.Drawables.lightrain; }
-        if (code == 63) { return Rez.Drawables.rain; }
-        if (code == 65) { return Rez.Drawables.heavyrain; }
+        if (code == 51 || code == 53 || code == 55 || code == 56 || code == 57 || code == 61) { return Rez.Drawables.lightrain; }
+        if (code == 63 || code == 66) { return Rez.Drawables.rain; }
+        if (code == 65 || code == 67) { return Rez.Drawables.heavyrain; }
         if (code == 71 || code == 77) { return Rez.Drawables.lightsnow; }
         if (code == 73 || code == 85) { return Rez.Drawables.snow; }
         if (code == 75 || code == 86) { return Rez.Drawables.heavysnow; }
@@ -60,9 +60,9 @@ module WeatherIcons {
         if (code == 2)  { return isDay ? Rez.Drawables.partlycloudy_day_sm : Rez.Drawables.partlycloudy_night_sm; }
         if (code == 3)  { return Rez.Drawables.cloudy_sm; }
         if (code == 45 || code == 48) { return Rez.Drawables.fog_sm; }
-        if (code == 51 || code == 53 || code == 55 || code == 61) { return Rez.Drawables.lightrain_sm; }
-        if (code == 63) { return Rez.Drawables.rain_sm; }
-        if (code == 65) { return Rez.Drawables.heavyrain_sm; }
+        if (code == 51 || code == 53 || code == 55 || code == 56 || code == 57 || code == 61) { return Rez.Drawables.lightrain_sm; }
+        if (code == 63 || code == 66) { return Rez.Drawables.rain_sm; }
+        if (code == 65 || code == 67) { return Rez.Drawables.heavyrain_sm; }
         if (code == 71 || code == 77) { return Rez.Drawables.lightsnow_sm; }
         if (code == 73 || code == 85) { return Rez.Drawables.snow_sm; }
         if (code == 75 || code == 86) { return Rez.Drawables.heavysnow_sm; }
@@ -75,13 +75,13 @@ module WeatherIcons {
     }
 }
 
-//! Loads icon bitmaps once and keeps them while the widget is on screen.
-//! A page shows at most 9 icons and each is a few hundred bytes, so the cache
-//! stays small; WeatherView clears it in onHide() to free the memory.
-class IconCache {
+//! Loads icon bitmaps and page text once and keeps them while the widget is on
+//! screen. A page shows at most 9 icons of a few hundred bytes each and a few
+//! short strings, so the cache stays small; WeatherView clears it in onHide().
+class ResourceCache {
 
-    //! Loaded bitmaps by resource ID.
-    private var bitmaps as Dictionary<ResourceId, WatchUi.BitmapResource> = {} as Dictionary<ResourceId, WatchUi.BitmapResource>;
+    //! Loaded resources by resource ID.
+    private var loaded as Dictionary<ResourceId, Object> = {} as Dictionary<ResourceId, Object>;
 
     //! Creates an empty cache.
     function initialize() {
@@ -89,17 +89,29 @@ class IconCache {
 
     //! @param id A drawable resource ID from WeatherIcons.
     //! @return The bitmap, loaded from resources on first use.
-    function get(id as ResourceId) as WatchUi.BitmapResource {
-        var bitmap = bitmaps[id];
-        if (bitmap == null) {
-            bitmap = WatchUi.loadResource(id) as WatchUi.BitmapResource;
-            bitmaps[id] = bitmap;
-        }
-        return bitmap;
+    function bitmap(id as ResourceId) as WatchUi.BitmapResource {
+        return load(id) as WatchUi.BitmapResource;
     }
 
-    //! Drops every loaded bitmap.
+    //! @param id A string resource ID (Rez.Strings).
+    //! @return The text, loaded from resources on first use.
+    function text(id as ResourceId) as String {
+        return load(id) as String;
+    }
+
+    //! Drops every loaded resource.
     function clear() as Void {
-        bitmaps = {} as Dictionary<ResourceId, WatchUi.BitmapResource>;
+        loaded = {} as Dictionary<ResourceId, Object>;
+    }
+
+    //! @param id Any resource ID.
+    //! @return The resource, loaded on first use.
+    private function load(id as ResourceId) as Object {
+        var value = loaded[id];
+        if (value == null) {
+            value = WatchUi.loadResource(id) as Object;
+            loaded[id] = value;
+        }
+        return value;
     }
 }

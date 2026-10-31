@@ -67,14 +67,40 @@ function homeNameIgnoresMirroredGps(logger as Logger) as Boolean {
 //! not (round-4 bug K: Home changed while the widget was closed).
 (:test)
 function homeFetchedForCurrentSetting(logger as Logger) as Boolean {
-    var saved = FetchRules.homeFetchRecord(-27.47f, 153.02f);
-    Test.assert(FetchRules.fetchedForHome(-27.47f, 153.02f, saved));
-    Test.assert(FetchRules.fetchedForHome(-27.475f, 153.025f, saved));
-    Test.assert(!FetchRules.fetchedForHome(-33.87f, 151.21f, saved));
-    Test.assert(!FetchRules.fetchedForHome(-27.47f, 153.04f, saved));
-    Test.assert(!FetchRules.fetchedForHome(-27.47f, 153.02f, []));
-    Test.assert(!FetchRules.fetchedForHome(-27.47f, 153.02f, null));
-    Test.assert(!FetchRules.fetchedForHome(-27.47f, 153.02f, ["-27.47", 153.02f]));
-    Test.assert(!FetchRules.fetchedForHome(-27.47f, 153.02f, "x"));
+    var saved = FetchRules.fetchRecord(-27.47f, 153.02f);
+    Test.assert(FetchRules.fetchedFor(-27.47f, 153.02f, saved));
+    Test.assert(FetchRules.fetchedFor(-27.475f, 153.025f, saved));
+    Test.assert(!FetchRules.fetchedFor(-33.87f, 151.21f, saved));
+    Test.assert(!FetchRules.fetchedFor(-27.47f, 153.04f, saved));
+    Test.assert(!FetchRules.fetchedFor(-27.47f, 153.02f, []));
+    Test.assert(!FetchRules.fetchedFor(-27.47f, 153.02f, null));
+    Test.assert(!FetchRules.fetchedFor(-27.47f, 153.02f, ["-27.47", 153.02f]));
+    Test.assert(!FetchRules.fetchedFor(-27.47f, 153.02f, "x"));
+    return true;
+}
+
+//! A location is fetched when it has no data, its data is for another place, or
+//! the data is stale; fresh data for the current place is kept.
+(:test)
+function needsFetchRules(logger as Logger) as Boolean {
+    var now = 1000000;
+    Test.assert(!FetchRules.needsFetch(true, now - 60, now, 30, true));
+    Test.assert(FetchRules.needsFetch(false, now - 60, now, 30, true));
+    Test.assert(FetchRules.needsFetch(true, now - 60, now, 30, false));
+    Test.assert(FetchRules.needsFetch(true, now - 30 * 60, now, 30, true));
+    Test.assert(FetchRules.needsFetch(true, null, now, 30, true));
+    return true;
+}
+
+//! Parsed replies are saved; only network errors are retried, and only while
+//! retries are left; HTTP errors and damaged replies fail at once.
+(:test)
+function gpsReplyActions(logger as Logger) as Boolean {
+    Test.assertEqual(FetchRules.gpsReplyAction(true, 200, 0), FetchRules.REPLY_SAVE);
+    Test.assertEqual(FetchRules.gpsReplyAction(false, -104, 3), FetchRules.REPLY_RETRY);
+    Test.assertEqual(FetchRules.gpsReplyAction(false, 0, 1), FetchRules.REPLY_RETRY);
+    Test.assertEqual(FetchRules.gpsReplyAction(false, -104, 0), FetchRules.REPLY_FAILED);
+    Test.assertEqual(FetchRules.gpsReplyAction(false, 500, 3), FetchRules.REPLY_FAILED);
+    Test.assertEqual(FetchRules.gpsReplyAction(false, 200, 3), FetchRules.REPLY_FAILED);
     return true;
 }

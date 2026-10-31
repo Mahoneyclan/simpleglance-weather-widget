@@ -34,9 +34,11 @@ module WeatherState {
     //! [latitude, longitude, name] (FetchRules.placeRecord()). They replace
     //! "home_lat_cached" / "home_lon_cached", which are no longer written or read.
     const PLACE_KEYS = ["gps_place", "home_place"];
-    //! Storage key of the Home coordinates the saved Home weather was fetched for
-    //! (FetchRules.homeFetchRecord()), or [] when it is a copy of the GPS data. Permanent.
-    const HOME_FETCH_FOR_KEY = "home_fetch_for";
+    //! Storage keys of the coordinates each slot's weather was fetched for
+    //! (FetchRules.fetchRecord()): GPS rounded to about 1 km, Home as set; [] or
+    //! missing when the Home data is a copy of the GPS data. Data fetched for
+    //! somewhere else is fetched again. Permanent.
+    const FETCH_FOR_KEYS = ["gps_fetch_for", "home_fetch_for"];
 
     //! Which slot's fetches fill a slot: Home shows a copy of GPS unless Home is set,
     //! so the Home page never shows a location the user did not choose.

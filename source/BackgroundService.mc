@@ -173,7 +173,7 @@ class BackgroundService extends Toybox.System.ServiceDelegate {
     private function finish() as Void {
         var place = (homeNamed && homeResult != null)
             ? FetchRules.placeRecord(homeCoords[0], homeCoords[1], homeLocationName) : null;
-        var fetchFor = homeConfiguredFlag ? FetchRules.homeFetchRecord(homeCoords[0], homeCoords[1]) : null;
+        var fetchFor = homeConfiguredFlag ? FetchRules.fetchRecord(homeCoords[0], homeCoords[1]) : null;
         Background.exit(BackgroundResult.build(gpsResult, homeResult, gpsForecast, homeForecast, place, fetchFor));
     }
 }

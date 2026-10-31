@@ -11,7 +11,7 @@ SimpleGlance Weather Widget ("the app") is a Connect IQ widget that shows weathe
 To show weather and place names, the app sends **map coordinates** (latitude and longitude, rounded to 2 decimal places — about 1 kilometre, so not your exact position) to two free online services. Coordinates are sent for:
 
 - your **current GPS location**, and
-- your **Home location**, if you have set one in the app's settings.
+- your **Home location** from the app's settings. New installs start with Brisbane CBD, a public place; if you enter your own Home, those coordinates are sent instead.
 
 Requests go over an encrypted connection (HTTPS) through your phone's Garmin Connect app, so each service also sees your phone's internet (IP) address, as with any web request.
 
@@ -20,7 +20,7 @@ Requests go over an encrypted connection (HTTPS) through your phone's Garmin Con
 | [Open-Meteo](https://open-meteo.com) | OpenMeteo GmbH | Switzerland | Coordinates | To get the weather forecast |
 | [Nominatim](https://nominatim.openstreetmap.org) | OpenStreetMap Foundation | United Kingdom | Coordinates | To turn coordinates into a place name (e.g. a suburb or town) |
 
-Requests are made when you open the widget or press MENU (unless the data was refreshed within your chosen interval), when you change the settings (Home only), and automatically in the background at the interval you choose in settings (15, 30 or 60 minutes), even while the widget is closed. A place name is looked up only when a location has moved about 1 kilometre since its last successful lookup.
+Requests are made when you open the widget or press MENU (unless the data was refreshed within your chosen interval and you have not moved about 1 kilometre), when you change the settings (Home only), and automatically in the background at the interval you choose in settings (15, 30 or 60 minutes), even while the widget is closed. A place name is looked up only when a location has moved about 1 kilometre since its last successful lookup.
 
 Neither service requires an account, and the app sends no name, email address, device identifier or other personal details. Each service handles the data it receives under its own policy:
 
@@ -35,7 +35,7 @@ The app stores the following on your watch only, using Garmin's Application Stor
 - the Home coordinates you entered (in the app's settings)
 - the latest weather, forecast and place names, so they show instantly when you open the widget
 - for each place name, the coordinates (rounded to about 1 kilometre) it was looked up for, so it is not looked up again
-- with the Home weather, the Home coordinates it was fetched for, so a changed Home location is fetched again
+- with each location's weather, the coordinates it was fetched for (your GPS position rounded to about 1 kilometre, and the Home coordinates you entered), so a move or a changed Home location is fetched again
 
 This data is not sent anywhere except as described above. It stays on the watch until the widget is removed.
 
@@ -50,7 +50,8 @@ The app does **not** collect or send:
 
 ## Your choices
 
-- To stop sending your Home location, leave the Home settings blank.
+- To set Home to where you are, press MENU on the watch and choose Set Home here. It is saved in the app's settings on your watch (and shown in the Garmin Connect app), and sent like any Home location.
+- To stop sending a Home location, clear both Home settings; the Home page then shows your GPS location.
 - To stop all data use, remove the widget from your watch.
 
 ## Contact

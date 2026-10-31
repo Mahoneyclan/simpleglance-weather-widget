@@ -26,7 +26,7 @@ module BackgroundResult {
     //! looked the name up successfully, otherwise null.
     const HOME_PLACE = 4;
     //! Position of the Home coordinates the Home weather was fetched for
-    //! (FetchRules.homeFetchRecord()), or null when the Home weather is a GPS copy.
+    //! (FetchRules.fetchRecord()), or null when the Home weather is a GPS copy.
     const HOME_FETCH_FOR = 5;
     //! Item count of a result. A shorter result (from a run of an older version
     //! that straddled an update) is ignored; the next run replaces it.
@@ -70,7 +70,7 @@ module BackgroundResult {
                 if (slot == WeatherState.HOME) {
                     var fetchFor = Values.arrayOrNull(r[HOME_FETCH_FOR], 2);
                     var valid = fetchFor != null && Values.isNumeric(fetchFor[0]) && Values.isNumeric(fetchFor[1]);
-                    out[WeatherState.HOME_FETCH_FOR_KEY] = (valid ? fetchFor : []) as Array<Application.PropertyValueType>;
+                    out[(WeatherState.FETCH_FOR_KEYS[WeatherState.HOME] as String)] = (valid ? fetchFor : []) as Array<Application.PropertyValueType>;
                 }
             }
             if (forecast instanceof Array) {

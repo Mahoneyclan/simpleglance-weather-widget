@@ -22,16 +22,21 @@ module HomeSettings {
     //! "Check Home settings" message.
     const STATUS_INVALID = 2;
 
-    //! Home latitude that versions before the blank defaults shipped in
-    //! resources/properties.xml. Watches that installed one of those versions still
-    //! hold this value, so it must keep meaning "Home not set" (see homeStatus()).
-    //! New installs start with blank settings.
-    const LEGACY_DEFAULT_LAT = -27.3705f;
-    //! Legacy default Home longitude; see LEGACY_DEFAULT_LAT.
-    const LEGACY_DEFAULT_LON = 152.8691f;
+    //! Home latitude text that versions before 1.5.0 shipped in
+    //! resources/properties.xml. Watches that installed one of those versions and
+    //! never changed it still hold exactly this text, so it keeps meaning "Home not
+    //! set" (see homeStatus()). Only the exact text counts: a Home typed or saved
+    //! near it (for example by someone who lives there) is a real Home.
+    const LEGACY_DEFAULT_LAT = "-27.3705";
+    //! Legacy default Home longitude text; see LEGACY_DEFAULT_LAT.
+    const LEGACY_DEFAULT_LON = "152.8691";
 
-    //! Values within this many degrees (about 1.1 km) of both legacy defaults count as "not set".
-    const LEGACY_DEFAULT_TOLERANCE = 0.01f;
+    //! Default Home of new installs: Brisbane CBD. Must match the home_lat/home_lon
+    //! defaults in resources/properties.xml; a public place, not anyone's home.
+    const DEFAULT_LAT = "-27.4698";
+    //! Default Home longitude; see DEFAULT_LAT.
+    const DEFAULT_LON = "153.0251";
+
 
     //! Parses one coordinate setting. Properties are strings because Connect IQ
     //! settings only offer alphaNumeric input for decimals; numbers are accepted too.
@@ -61,11 +66,9 @@ module HomeSettings {
         var lat = parseCoordinate(latValue, 90.0f);
         var lon = parseCoordinate(lonValue, 180.0f);
         if (lat == null || lon == null) { return STATUS_INVALID; }
-        if ((lat - LEGACY_DEFAULT_LAT).abs() <= LEGACY_DEFAULT_TOLERANCE
-                && (lon - LEGACY_DEFAULT_LON).abs() <= LEGACY_DEFAULT_TOLERANCE) {
-            return STATUS_NOT_SET;
-        }
-        return STATUS_SET;
+        var legacy = latValue instanceof String && lonValue instanceof String
+            && latValue.equals(LEGACY_DEFAULT_LAT) && lonValue.equals(LEGACY_DEFAULT_LON);
+        return legacy ? STATUS_NOT_SET : STATUS_SET;
     }
 
     //! @return The status of the current Home settings (reads Properties).

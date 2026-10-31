@@ -1,6 +1,6 @@
 // WeatherDelegate.mc — button and swipe handling for the full-screen widget.
 // Runs in the foreground (widget) process only. Changes WeatherView's page and
-// location and asks it to refresh; it does no drawing or networking itself.
+// location and opens the MENU menu (HomeMenu.mc); it does no drawing or networking.
 
 import Toybox.Lang;
 import Toybox.WatchUi;
@@ -9,7 +9,7 @@ import Toybox.WatchUi;
 //!
 //! - DOWN / UP cycle through the three pages: current conditions → hourly → daily.
 //! - SELECT toggles between the GPS location and the Home location (all pages).
-//! - MENU asks WeatherView to refresh its data.
+//! - MENU opens a menu: Refresh, or Set Home here (HomeMenu.mc).
 class WeatherDelegate extends WatchUi.BehaviorDelegate {
 
     //! The view this delegate controls.
@@ -45,11 +45,11 @@ class WeatherDelegate extends WatchUi.BehaviorDelegate {
         return true;
     }
 
-    //! MENU: ask WeatherView to refresh. Only locations whose data is missing or
-    //! older than the refresh interval are fetched, so this is not a forced refresh.
+    //! MENU: open the menu (Refresh, Set Home here). Refresh fetches only data
+    //! that is missing, stale or for another place, so it is not a forced refresh.
     //! @return true, because the event is always handled.
     function onMenu() as Boolean {
-        view.refresh();
+        HomeMenu.show(view);
         return true;
     }
 }

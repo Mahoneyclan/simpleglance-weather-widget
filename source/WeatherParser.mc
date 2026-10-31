@@ -135,7 +135,7 @@ module WeatherParser {
         var out = [new [HOURS], new [HOURS], new [HOURS], new [HOURS],
                    new [HOURS], new [HOURS], new [HOURS]];
         for (var i = 0; i < HOURS; i++) {
-            out[0][i] = hourLabel(hour, i);
+            out[0][i] = (i == 0) ? "Now" : hourLabel((hour + i) % 24, false);
             out[1][i] = roundOr((i == 0 && nowTemp != null) ? nowTemp : temps[i], 0);
             out[2][i] = Values.toNumberOr(elementAt(rainP, i), 0);
             out[3][i] = Values.toNumberOr(elementAt(wcode, i), 0);
@@ -173,15 +173,17 @@ module WeatherParser {
         return out;
     }
 
-    //! @param hour Current hour 0–23.
-    //! @param offset Hours ahead (0 = now).
-    //! @return "Now" for offset 0, otherwise a 12-hour label such as "10p" or "12a".
-    function hourLabel(hour as Number, offset as Number) as String {
-        if (offset == 0) { return "Now"; }
-        var hr  = (hour + offset) % 24;
-        var h12 = hr % 12;
+    //! Formats an hour heading of the hourly page. Used by ForecastPages when it
+    //! draws, and here for the labels stored with the forecast, which are shown
+    //! only for data saved without a fetch time (older versions).
+    //! @param hour Hour of day 0–23.
+    //! @param is24Hour true when the watch is set to 24-hour time.
+    //! @return For example "14:00", or "2p" / "12a" in 12-hour style.
+    function hourLabel(hour as Number, is24Hour as Boolean) as String {
+        if (is24Hour) { return hour.format("%02d") + ":00"; }
+        var h12 = hour % 12;
         if (h12 == 0) { h12 = 12; }
-        return h12.format("%d") + (hr < 12 ? "a" : "p");
+        return h12.format("%d") + (hour < 12 ? "a" : "p");
     }
 
     // MARK: - Place names

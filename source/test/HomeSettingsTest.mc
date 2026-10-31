@@ -13,6 +13,13 @@ function homeStatusValidPairIsSet(logger as Logger) as Boolean {
     return true;
 }
 
+//! The default Home of new installs (Brisbane CBD) is a real, set Home.
+(:test)
+function defaultHomeIsSet(logger as Logger) as Boolean {
+    Test.assertEqual(HomeSettings.homeStatus(HomeSettings.DEFAULT_LAT, HomeSettings.DEFAULT_LON), HomeSettings.STATUS_SET);
+    return true;
+}
+
 //! Both values blank (cleared by the user, or missing) counts as not set.
 (:test)
 function homeStatusBlankIsNotSet(logger as Logger) as Boolean {
@@ -21,15 +28,18 @@ function homeStatusBlankIsNotSet(logger as Logger) as Boolean {
     return true;
 }
 
-//! The legacy defaults (shipped by older versions), and values within 0.01° of them, count as not set.
+//! Only the exact legacy default text (shipped by versions before 1.5.0) counts
+//! as not set; a Home near it, or the same place written differently, is set.
 (:test)
 function homeStatusDefaultsAreNotSet(logger as Logger) as Boolean {
     Test.assertEqual(HomeSettings.homeStatus("-27.3705", "152.8691"), HomeSettings.STATUS_NOT_SET);
-    Test.assertEqual(HomeSettings.homeStatus("-27.375", "152.865"), HomeSettings.STATUS_NOT_SET);
+    Test.assertEqual(HomeSettings.homeStatus("-27.375", "152.865"), HomeSettings.STATUS_SET);
+    Test.assertEqual(HomeSettings.homeStatus("-27.37050", "152.86910"), HomeSettings.STATUS_SET);
+    Test.assertEqual(HomeSettings.homeStatus("-27.3705", "152.87"), HomeSettings.STATUS_SET);
     return true;
 }
 
-//! Moving one value more than 0.01° from the default counts as set.
+//! Changing either value away from the legacy default counts as set.
 (:test)
 function homeStatusOneValueChangedIsSet(logger as Logger) as Boolean {
     Test.assertEqual(HomeSettings.homeStatus("-27.3705", "153.0"), HomeSettings.STATUS_SET);

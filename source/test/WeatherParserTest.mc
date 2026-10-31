@@ -160,13 +160,15 @@ function parseForecastDefaultsOptionalSeries(logger as Logger) as Boolean {
     return true;
 }
 
-//! Hour labels wrap past midnight and use 12-hour format.
+//! Hour labels in 12-hour ("12a", "11p") and 24-hour ("14:00") style.
 (:test)
 function hourLabelsWrap(logger as Logger) as Boolean {
-    Test.assertEqual(WeatherParser.hourLabel(23, 0), "Now");
-    Test.assertEqual(WeatherParser.hourLabel(23, 1), "12a");
-    Test.assertEqual(WeatherParser.hourLabel(11, 1), "12p");
-    Test.assertEqual(WeatherParser.hourLabel(0, 3), "3a");
+    Test.assertEqual(WeatherParser.hourLabel(0, false), "12a");
+    Test.assertEqual(WeatherParser.hourLabel(12, false), "12p");
+    Test.assertEqual(WeatherParser.hourLabel(3, false), "3a");
+    Test.assertEqual(WeatherParser.hourLabel(23, false), "11p");
+    Test.assertEqual(WeatherParser.hourLabel(0, true), "00:00");
+    Test.assertEqual(WeatherParser.hourLabel(14, true), "14:00");
     return true;
 }
 

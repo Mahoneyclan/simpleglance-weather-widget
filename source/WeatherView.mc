@@ -20,10 +20,12 @@ class WeatherView extends WatchUi.View {
     //! Number of pages.
     private const PAGE_COUNT = 3;
 
+    //! Storage, settings, requests and timers, shared with data.
+    private var services as WatchServices = new WatchServices();
     //! Weather for both locations.
-    private var data as WeatherData = new WeatherData();
-    //! Icon bitmaps, kept while the widget is on screen.
-    private var icons as IconCache = new IconCache();
+    private var data as WeatherData = new WeatherData(services);
+    //! Icon bitmaps and page text, kept while the widget is on screen.
+    private var res as ResourceCache = new ResourceCache();
     //! Active page, 0…PAGE_COUNT-1.
     private var pageIndex as Number = 0;
     //! Active location: WeatherState.GPS or WeatherState.HOME. Applies to every page.
@@ -44,10 +46,10 @@ class WeatherView extends WatchUi.View {
         data.refresh();
     }
 
-    //! Stops the retry timer and frees icon bitmaps while the widget is off screen.
+    //! Stops the retry timer and frees icons and text while the widget is off screen.
     function onHide() as Void {
         data.stop();
-        icons.clear();
+        res.clear();
     }
 
     //! Moves to another page, wrapping around. Called by WeatherDelegate.
@@ -71,6 +73,18 @@ class WeatherView extends WatchUi.View {
     //! Settings changed in Garmin Connect; see WeatherData.settingsChanged().
     function settingsChanged() as Void {
         data.settingsChanged();
+        WatchUi.requestUpdate();
+    }
+
+    //! @return The best known GPS position, or null (for the MENU menu).
+    function position() as Array<Double>? {
+        return data.position();
+    }
+
+    //! MENU → Set Home here, confirmed: saves the position as Home and fetches it.
+    //! Shows the Home page so the change is visible.
+    function setHomeHere() as Void {
+        if (HomeHere.apply(services, data)) { locationIndex = WeatherState.HOME; }
         WatchUi.requestUpdate();
     }
 
@@ -101,11 +115,11 @@ class WeatherView extends WatchUi.View {
             drawMessage(dc, emptyMessage());
         } else {
             if (pageIndex == 0) {
-                CurrentPage.draw(dc, current as Array, forecast, icons);
+                CurrentPage.draw(dc, current as Array, forecast, res);
             } else if (pageIndex == 1) {
-                ForecastPages.drawHourly(dc, forecast as Array, icons);
+                ForecastPages.drawHourly(dc, forecast as Array, res, data.fetchTime(locationIndex));
             } else {
-                ForecastPages.drawDaily(dc, forecast as Array, icons);
+                ForecastPages.drawDaily(dc, forecast as Array, res, data.fetchTime(locationIndex));
             }
             if (data.lastAttemptFailed(locationIndex)) { drawOfflineLine(dc); }
         }
@@ -126,7 +140,7 @@ class WeatherView extends WatchUi.View {
     private function drawMessage(dc as Dc, id as ResourceId) as Void {
         dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
         dc.drawText(dc.getWidth() / 2, dc.getHeight() / 2, Graphics.FONT_SMALL,
-            WatchUi.loadResource(id) as String,
+            res.text(id),
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 
@@ -135,7 +149,7 @@ class WeatherView extends WatchUi.View {
     //! saved by an older version).
     //! @param dc The drawing context.
     private function drawOfflineLine(dc as Dc) as Void {
-        var text = WatchUi.loadResource(Rez.Strings.Offline) as String;
+        var text = res.text(Rez.Strings.Offline);
         var time = data.fetchTime(locationIndex);
         if (time != null) {
             var info = Gregorian.info(new Time.Moment(time), Time.FORMAT_SHORT);
@@ -148,7 +162,8 @@ class WeatherView extends WatchUi.View {
     }
 
     //! Draws two dots at the bottom of every page: left = GPS, right = Home.
-    //! The active location's dot is filled white; the other is outlined dark grey.
+    //! The active location's dot is filled white; the other is outlined light grey
+    //! (dark grey would be below the 3:1 contrast needed for a control's state).
     //! @param dc The drawing context.
     private function drawIndicator(dc as Dc) as Void {
         var W = dc.getWidth();
@@ -161,7 +176,7 @@ class WeatherView extends WatchUi.View {
                 dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
                 dc.fillCircle(cx, cy, r);
             } else {
-                dc.setColor(Graphics.COLOR_DK_GRAY, Graphics.COLOR_TRANSPARENT);
+                dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
                 dc.drawCircle(cx, cy, r);
             }
         }

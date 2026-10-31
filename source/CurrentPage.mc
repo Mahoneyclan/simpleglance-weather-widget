@@ -6,7 +6,8 @@ import Toybox.Graphics;
 import Toybox.Lang;
 import Toybox.Math;
 
-//! Current-conditions page: three sectors divided by clock-hand lines.
+//! Current-conditions page: three sectors divided by clock-hand lines. Values
+//! are stored in metric and shown in the watch's units (Units.mc).
 //!   Top (9:30→12→2:30)         : location name, H, current temp, L, feels-like
 //!   Centre                     : condition icon in a dark circle
 //!   Bottom-right quadrant (3→6): wind speed, gust + compass direction
@@ -23,17 +24,20 @@ module CurrentPage {
     //! @param dc The drawing context.
     //! @param w A validated current-conditions array (WeatherSlots.CUR_*).
     //! @param forecast The matching validated forecast, or null.
-    //! @param icons Bitmap cache for the condition icon.
-    function draw(dc as Dc, w as Array, forecast as Array?, icons as IconCache) as Void {
+    //! @param res Bitmap and text cache.
+    function draw(dc as Dc, w as Array, forecast as Array?, res as ResourceCache) as Void {
+        var f = Units.fahrenheit();
         var temp = Math.round((w[WeatherSlots.CUR_TEMP] as Numeric).toFloat()).toNumber();
         var hiLo = highLow(forecast, temp);
         drawDividers(dc);
-        drawTemperature(dc, w[WeatherSlots.CUR_NAME] as String, temp, hiLo);
-        drawIcon(dc, w, icons);
-        drawRain(dc, (w[WeatherSlots.CUR_RAIN] as Numeric).toFloat(), rainProbability(forecast));
-        drawWind(dc, (w[WeatherSlots.CUR_WIND] as Numeric).toFloat(),
-            (w[WeatherSlots.CUR_GUST] as Numeric).toFloat(),
-            (w[WeatherSlots.CUR_WIND_DIR] as Numeric).toFloat());
+        drawTemperature(dc, w[WeatherSlots.CUR_NAME] as String,
+            [Units.temperature(w[WeatherSlots.CUR_TEMP] as Numeric, f),
+             Units.temperature(hiLo[0], f), Units.temperature(hiLo[1], f)] as Array<Number>,
+            res.text(f ? Rez.Strings.UnitFahrenheit : Rez.Strings.UnitCelsius), res);
+        drawIcon(dc, w, res, f);
+        drawRain(dc, w[WeatherSlots.CUR_RAIN] as Numeric, rainProbability(forecast), res);
+        drawWind(dc, w[WeatherSlots.CUR_WIND] as Numeric, w[WeatherSlots.CUR_GUST] as Numeric,
+            (w[WeatherSlots.CUR_WIND_DIR] as Numeric).toFloat(), res);
     }
 
     //! @param forecast A validated forecast array, or null.
@@ -56,7 +60,8 @@ module CurrentPage {
 
     //! Draws the three dividing lines at the 2:30, 6:00 and 9:30 clock positions.
     //! sin(75°)=0.966 and cos(75°)=0.259 give the 2:30 and 9:30 directions; the
-    //! lines reach 92% of the half-width.
+    //! lines reach 92% of the half-width. They are decorative (the text alone
+    //! carries the meaning), so they stay dark grey.
     //! @param dc The drawing context.
     function drawDividers(dc as Dc) as Void {
         var W = dc.getWidth();
@@ -74,30 +79,32 @@ module CurrentPage {
     }
 
     //! Draws the top sector: place name, then the temperature in large digits
-    //! with a superscript °C, flanked by today's high and low.
+    //! with a superscript unit, flanked by today's high and low.
     //! @param dc The drawing context.
     //! @param name Location name.
-    //! @param temp Current temperature °C.
-    //! @param hiLo [high, low] from highLow().
-    function drawTemperature(dc as Dc, name as String, temp as Number, hiLo as Array<Number>) as Void {
+    //! @param temps [current, high, low] in the display unit.
+    //! @param unit "°C" or "°F".
+    //! @param res Text cache.
+    function drawTemperature(dc as Dc, name as String, temps as Array<Number>, unit as String,
+                             res as ResourceCache) as Void {
         var W = dc.getWidth();
         var H = dc.getHeight();
         dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
         dc.drawText(W / 2, (H * 0.10).toNumber(), Graphics.FONT_TINY, name, CENTER);
 
-        var tempStr = temp.format("%d");
+        var tempStr = temps[0].format("%d");
         var numW = dc.getTextWidthInPixels(tempStr, Graphics.FONT_NUMBER_MEDIUM);
-        var unitW = dc.getTextWidthInPixels("°C", Graphics.FONT_SMALL);
+        var unitW = dc.getTextWidthInPixels(unit, Graphics.FONT_SMALL);
         var numX = (W - numW - unitW) / 2;
         var numY = (H * 0.25).toNumber();
-        dc.drawText(numX - 6, numY, Graphics.FONT_TINY, "H:" + hiLo[0].format("%d") + "°",
+        dc.drawText(numX - 6, numY, Graphics.FONT_TINY, res.text(Rez.Strings.High) + temps[1].format("%d") + "°",
             Graphics.TEXT_JUSTIFY_RIGHT | Graphics.TEXT_JUSTIFY_VCENTER);
-        dc.drawText(numX + numW + unitW + 6, numY, Graphics.FONT_TINY, "L:" + hiLo[1].format("%d") + "°",
+        dc.drawText(numX + numW + unitW + 6, numY, Graphics.FONT_TINY, res.text(Rez.Strings.Low) + temps[2].format("%d") + "°",
             Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
         dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
         dc.drawText(numX, numY, Graphics.FONT_NUMBER_MEDIUM, tempStr,
             Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
-        dc.drawText(numX + numW + 2, numY - (H * 0.05).toNumber(), Graphics.FONT_SMALL, "°C",
+        dc.drawText(numX + numW + 2, numY - (H * 0.05).toNumber(), Graphics.FONT_SMALL, unit,
             Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 
@@ -105,12 +112,13 @@ module CurrentPage {
     //! half, then the feels-like temperature just above it.
     //! @param dc The drawing context.
     //! @param w The current-conditions array.
-    //! @param icons Bitmap cache.
-    function drawIcon(dc as Dc, w as Array, icons as IconCache) as Void {
+    //! @param res Bitmap and text cache.
+    //! @param f true to show the feels-like temperature in °F.
+    function drawIcon(dc as Dc, w as Array, res as ResourceCache, f as Boolean) as Void {
         var cx = dc.getWidth() / 2;
         var cy = dc.getHeight() / 2;
         var isDay = (w[WeatherSlots.CUR_IS_DAY] as Number) != 0;
-        var icon = icons.get(WeatherIcons.largeId(w[WeatherSlots.CUR_CODE] as Number, isDay));
+        var icon = res.bitmap(WeatherIcons.largeId(w[WeatherSlots.CUR_CODE] as Number, isDay));
         var iW = icon.getWidth();
         var iH = icon.getHeight();
         var circR = (iW > iH ? iW : iH) / 2 + 8;
@@ -122,32 +130,40 @@ module CurrentPage {
         dc.drawArc(cx, cy, circR, Graphics.ARC_CLOCKWISE, 15, 165);
         dc.drawBitmap(cx - iW / 2, cy - iH / 2, icon);
 
-        var feels = Math.round((w[WeatherSlots.CUR_FEELS] as Numeric).toFloat()).toNumber();
+        var feels = Units.temperature(w[WeatherSlots.CUR_FEELS] as Numeric, f);
         dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
         dc.drawText(cx, (dc.getHeight() * 0.37).toNumber(), Graphics.FONT_XTINY,
-            "Feels " + feels.format("%d") + "°C", CENTER);
+            res.text(Rez.Strings.Feels) + " " + feels.format("%d")
+                + res.text(f ? Rez.Strings.UnitFahrenheit : Rez.Strings.UnitCelsius), CENTER);
     }
 
     //! Draws the bottom-left quadrant: rain this hour and its probability.
     //! @param dc The drawing context.
-    //! @param rain Rain in mm.
+    //! @param rain Rain in mm (converted to inches when the watch uses miles).
     //! @param prob Probability in %.
-    function drawRain(dc as Dc, rain as Float, prob as Number) as Void {
+    //! @param res Text cache.
+    function drawRain(dc as Dc, rain as Numeric, prob as Number, res as ResourceCache) as Void {
         var W = dc.getWidth();
+        var s = Units.statute();
         drawQuadrant(dc, (W * 0.06).toNumber(), Graphics.TEXT_JUSTIFY_LEFT, (W * 0.25).toNumber(),
-            "RAIN", rain.format("%.1f") + " mm", "prob " + prob.format("%d") + "%");
+            res.text(Rez.Strings.Rain),
+            Units.rainText(rain, s) + " " + res.text(s ? Rez.Strings.UnitInch : Rez.Strings.UnitMm),
+            res.text(Rez.Strings.Chance) + " " + prob.format("%d") + "%");
     }
 
     //! Draws the bottom-right quadrant: wind speed, gust and compass direction.
     //! @param dc The drawing context.
-    //! @param speed Wind speed km/h.
-    //! @param gust Gust km/h.
+    //! @param speed Wind speed km/h (converted to mph when the watch uses miles).
+    //! @param gust Gust km/h, converted the same way.
     //! @param dir Direction in degrees the wind blows from.
-    function drawWind(dc as Dc, speed as Float, gust as Float, dir as Float) as Void {
+    //! @param res Text cache.
+    function drawWind(dc as Dc, speed as Numeric, gust as Numeric, dir as Float, res as ResourceCache) as Void {
         var W = dc.getWidth();
+        var s = Units.statute();
         drawQuadrant(dc, (W * 0.94).toNumber(), Graphics.TEXT_JUSTIFY_RIGHT, (W * 0.75).toNumber(),
-            "WIND", speed.format("%.0f") + " km/h",
-            "gust " + gust.format("%.0f") + "  " + WeatherFormat.windDirName(dir));
+            res.text(Rez.Strings.Wind),
+            Units.speedText(speed, s) + " " + res.text(s ? Rez.Strings.UnitMph : Rez.Strings.UnitKmh),
+            res.text(Rez.Strings.Gust) + " " + Units.speedText(gust, s) + "  " + WeatherFormat.windDirName(dir));
     }
 
     //! Draws one lower quadrant: a heading near the edge, a value and a detail line.

@@ -2,7 +2,7 @@
 
 ![Widget on Fenix 6 Pro](store_assets/cover_500x500.png)
 
-A clean, minimal weather widget for Garmin Fenix watches. Displays live conditions for two locations — your current GPS position and a configurable home location — with a single button toggle between them. Until you set a home location, the Home page simply mirrors your current GPS location instead of showing a placeholder town.
+A clean, minimal weather widget for Garmin Fenix watches. Displays live conditions for two locations — your current GPS position and a configurable home location — with a single button toggle between them. Home starts as Brisbane CBD; change it in the settings, or clear both values and the Home page mirrors your current GPS location.
 
 | Current Conditions | Hourly Forecast | Daily Forecast | Glance |
 |:---:|:---:|:---:|:---:|
@@ -13,11 +13,12 @@ A clean, minimal weather widget for Garmin Fenix watches. Displays live conditio
 - Radial layout — temperature (top), rain (bottom-left), wind (bottom-right)
 - Temperature, feels-like temperature, and today's high/low
 - Wind speed, gust and compass direction (N, NE, …)
-- Rainfall (mm, current hour) and chance of rain
+- Rainfall (current hour) and chance of rain
+- Follows the watch's settings: °C or °F, km/h and mm or mph and inches (from the distance setting), 12- or 24-hour time
 - **Hourly forecast** — weather icon, temperature, rain (mm), wind speed and direction for Now + 3 hours ahead
 - **Daily forecast** — weather icon, high/low temperature and rain for Today + 4 days ahead
 - Two-location toggle (GPS ↔ Home) with indicator dots showing active location
-- **Glance view** — two-column strip showing Home (left) and GPS (right), each with place name, condition-coloured dot and current temperature
+- **Glance view** — two-column strip showing GPS (left) and Home (right), the same order as the widget's dots, each with place name, current temperature and a condition word (with a coloured dot when it fits)
 - Background refresh on a configurable interval (15 / 30 / 60 min)
 - Offline cache — last known data shown instantly on launch; when a refresh fails, a "No connection · 14:05" line says how old the data on screen is
 - No API key required — powered by [Open-Meteo](https://open-meteo.com) (free, no sign-up)
@@ -32,7 +33,7 @@ Fenix 6, Fenix 6 Pro, Fenix 6S, Fenix 6S Pro
 |--------|--------|
 | DOWN / UP | Next / previous page: Current Conditions → Hourly → Daily |
 | SELECT | Toggle between GPS location and home location |
-| MENU | Refresh weather data (skipped if the data is newer than the refresh interval) |
+| MENU | Menu: **Refresh** (skipped if the data is newer than the refresh interval and you have not moved about 1 km), or **Set Home here** (saves your current position as Home, after a confirmation) |
 
 The two dots at the bottom of every page show the active location: left dot = GPS, right dot = Home.
 
@@ -41,12 +42,12 @@ The two dots at the bottom of every page show the active location: left dot = GP
 | Setting | Default | Options |
 |---------|---------|---------|
 | Background Refresh Interval | 30 min | 15 / 30 / 60 min |
-| Home Latitude | blank (not set) | Decimal degrees, −90 to 90 (e.g. -33.8688) |
-| Home Longitude | blank (not set) | Decimal degrees, −180 to 180 (e.g. 151.2093) |
+| Home Latitude | -27.4698 (Brisbane CBD) | Decimal degrees, −90 to 90 (e.g. -33.8688) |
+| Home Longitude | 153.0251 (Brisbane CBD) | Decimal degrees, −180 to 180 (e.g. 151.2093) |
 
-While both values are blank, Home is not set and the Home page mirrors your GPS location. (Older versions shipped preset coordinates instead of blanks; watches that still hold those values are also treated as "not set".) If a value is not a number, is out of range (latitude −90…90, longitude −180…180), or only one of the two is filled in, the Home page shows **Check Home settings in Garmin Connect** and no Home weather is fetched until it is fixed.
+New installs start with Brisbane CBD as Home; updates keep whatever the watch already holds. While both values are blank, Home is not set and the Home page mirrors your GPS location. (Versions before 1.5.0 shipped preset coordinates; watches that still hold exactly that preset are also treated as "not set". Any other value, even nearby, counts as a real Home.) If a value is not a number, is out of range (latitude −90…90, longitude −180…180), or only one of the two is filled in, the Home page shows **Check Home settings in Garmin Connect** and no Home weather is fetched until it is fixed.
 
-Change settings via the **Garmin Connect app** on your phone → My Device → Apps & Widgets → SimpleGlance Weather Widget.
+The quickest way to set Home is on the watch: press MENU, choose **Set Home here**, and confirm. Or change settings via the **Garmin Connect app** on your phone → My Device → Apps & Widgets → SimpleGlance Weather Widget.
 
 ## Architecture
 
@@ -72,6 +73,8 @@ monkeydo /tmp/simpleglance-test.prg fenix6pro -t
 monkeydoc -c private -f "$HOME/Library/Application Support/Garmin/ConnectIQ/Sdks/<your-sdk>/bin/api.mir" -o /tmp/simpleglance-doc source/*.mc source/test/*.mc
 ```
 
+Before a store release, run the hand-test script in [docs/TESTING.md](docs/TESTING.md) on a real watch.
+
 Or use the [VS Code Monkey C extension](https://marketplace.visualstudio.com/items?itemName=garmin.monkey-c).
 
 ## Data Source
@@ -84,8 +87,8 @@ Reverse geocoding provided by [Nominatim / OpenStreetMap](https://nominatim.open
 - After a Home change, Home is labelled "Home" until a place-name lookup succeeds.
 - Hour and day labels use the watch's time zone, not the location's.
 - The hourly page always uses daytime icons.
-- Freezing drizzle and freezing rain (WMO codes 56, 57, 66, 67) show the clear-sky icon.
-- A Home within about 1 km of the coordinates older versions shipped is treated as "not set".
+- Freezing drizzle and freezing rain (WMO codes 56, 57, 66, 67) show the ordinary rain icons; the icon set has no freezing icon.
+- In °F, temperatures are converted from whole °C, so they can be up to 1 °F off.
 - When Home changes from not set to set, the Home page shows the GPS data under the GPS name until the first Home reply arrives (usually a second or two).
 - The "No connection" line and message only cover failures since the widget was opened; a failed background refresh is not shown.
 

@@ -15,6 +15,7 @@ Stop early after 3 rounds, or when a round gains < 3 points.
 | 2 | 2026-10-29 | ee5993d + working tree | 66.8 | C | 34.4 | 32.4 | 0 / 0 / 1 / 8 | [round 2](../scorecards/scorecard-2026-10-29-round2.md) |
 | 3 | 2026-10-30 | ee5993d + working tree | 76.4 | B | 42.8 | 33.6 | 0 / 0 / 1 / 6 | [round 3](../scorecards/scorecard-2026-10-30-round3.md) |
 | 4 | 2026-10-31 | ee5993d + working tree | 85.2 | A | 48.8 | 36.4 | 0 / 0 / 0 / 4 | [round 4](../scorecards/scorecard-2026-10-31-round4.md) |
+| 6 | 2026-10-31 | afa9309 + working tree | 89.2 | A | 52.0 | 37.2 | 0 / 0 / 0 / 3 | [round 6](../scorecards/scorecard-2026-10-31-round6.md) (self-review) |
 
 ## Round 1
 
@@ -228,3 +229,57 @@ Status: done 2026-10-31. The owner approved item 1 of the round-4 next steps. "D
   - Tests: 40 distinct, 145 results, all PASS (`monkeydo` exit code 1 as before).
   - The builds overlapped with another session's Xcode build: the busy check printed it but did not stop. The test run was gated properly.
 - Needs a hand test on the watch: change Home in Garmin Connect while the widget is closed, then open it.
+
+## Round 6
+
+Status: done 2026-10-31. Scored 89.2 (A), see `docs/scorecards/scorecard-2026-10-31-round6.md`. Hand test pending. The owner asked for the testing items and usability items d–i, and chose not to build "Delete all my data" (recorded as `(deliberate)` in CLAUDE.md and accepted in SECURITY.md). For units, the recommended option was taken: follow the watch's settings.
+
+- **d (colour alone):** the glance shows a condition word (glance-scoped string resources) next to the temperature; the coloured dot is drawn only when it fits.
+- **e (contrast):** "--", the glance divider and the inactive location dot use light grey. The clock-sector lines and the forecast header rule are decorative and stay dark grey.
+- **f (units):** new `Units.mc` converts stored metric values to °F / mph / inches from the watch's temperature and distance settings. Hour headings follow the 12/24-hour setting. Hour and day headings are now worked out from the fetch time, so old data is no longer labelled "Now" or "Today".
+- **g (order):** the glance shows GPS left and Home right, like the widget's dots.
+- **h (icons):** freezing drizzle and rain (56, 57, 66, 67) use the rain icons.
+- **i (text):** page labels, units and "Now"/"Today" are in strings.xml; day names come from the system (localised). `IconCache` became `ResourceCache` (icons and text). The labels stored with the forecast stay English; they are shown only for data saved without a fetch time.
+- **Testing:** `docs/TESTING.md` hand-test script (stands in for UI tests). New pure rules `FetchRules.needsFetch()` and `gpsReplyAction()` replace logic in WeatherData. New tests: unit conversion, hour headings, glance words, freezing icons, needsFetch, gpsReplyAction.
+- Results:
+  - 4 device builds pass with 0 warnings; `-l 2` warnings unchanged at 14; monkeydoc reports 0 warnings.
+  - Tests: 45 distinct, 173 results, all PASS (`monkeydo` exit code 1 as before).
+  - Coverage: every rule, parser and calculation is tested; overall about 52% of non-UI functions. The rest (WeatherData, PlaceNames, BackgroundService fetch/callback code) needs fake Storage and requests to test: not done, owner decision.
+- Busy check for builds now matches only real build processes (`scratchpad/busy.sh`), not other sessions' wait loops.
+- The glance column drawing was split in two to stay under 40 lines per function (found while scoring).
+- Needs the hand-test script on the watch (`bin/SGWEATHR.prg`), especially the glance layout and 24-hour headings, which can't be checked by unit tests.
+
+## Round 7
+
+Status: done 2026-10-31 (testability, widget side only). The owner chose the lower-risk version: the background code is unchanged.
+
+- New `source/WatchServices.mc`: the only way WeatherData and PlaceNames reach the watch (Storage, settings, clock, requests, GPS, retry timer, redraws). No behaviour change.
+- New `source/test/WeatherDataTest.mc` with `FakeWatch` (in-memory Storage, recorded requests): 10 tests covering the GPS fetch and mirror, retries and "No connection", HTTP errors, fresh data, bug K, the "Home" placeholder and `home_fetch_for`, settings changes, failed place lookups, the one-shot GPS fix, damaged cache and invalid Home.
+- Checked that a test can fail: with the bug K fix broken in a scratch copy, `homeChangedWhileClosedIsFetched` fails and the rest pass.
+- Results:
+  - 4 device builds pass with 0 warnings; `-l 2` unchanged at 14; monkeydoc 0 warnings; 290/290 declarations documented; no function over 40 lines; WeatherData 298 lines.
+  - Tests: 55 distinct, 235 results, all PASS (`monkeydo` exit code 1 as before).
+  - Release build 90,924 → 91,564 bytes (+640, widget only). Peak memory not measured: a scratch run with a memory printout gave no output (the simulator likely started the glance). Added as TESTING.md section 8.
+  - Coverage: WeatherData 19/21 and PlaceNames 7/7 functions now tested; about 70% of non-UI functions overall (rough count). Still untested: BackgroundService, WeatherApp's background and settings hooks, `onPosition`, and thin system wrappers (WatchServices itself, request builders, settings readers).
+
+## Round 8
+
+Status: code and docs done 2026-10-31; hand test pending. Found by the owner on the watch: the GPS place showed "Grange" (about 20 km away) instead of Highvale/Samford, and a walk did not change it.
+
+- Cause (from the code; not confirmed on the watch): GpsPosition took the first position available, including an old last-known one or Garmin Weather's observation station, and only asked for a GPS fix when there was none. And fresh GPS data was never refetched after a move, so MENU did nothing.
+- Fix:
+  - `GpsPosition.choose()` (tested): current fix → running activity → last known → saved → weather station last; reports whether the position is a current fix.
+  - WeatherData asks for a one-shot fix whenever the position is not current, and refetches when the fix shows a move.
+  - New Storage key `gps_fetch_for` (rounded to ~1 km). `FetchRules.fetchedForHome()`/`homeFetchRecord()` became `fetchedFor()`/`fetchRecord()`, used by both slots; `WeatherState.HOME_FETCH_FOR_KEY` became `FETCH_FOR_KEYS` (stored key names unchanged).
+- Tests: `movedWhileDataFreshIsFetched` (the Grange/Highvale case), `oldPositionAsksForFix`, `positionSourceOrder`; `freshDataIsNotFetched` updated.
+- Docs: README (MENU), PRIVACY (requests and stored data), SECURITY, ARCHITECTURE, CHANGELOG, TESTING.md section 5a.
+
+## Round 9
+
+Status: code and docs done 2026-10-31; build, tests and hand test next. The owner asked for (1) Highvale to work as Home and (2) Home to be easy to change (option 3: watch menu and clearer settings), and earlier for Brisbane CBD as the default Home.
+
+- **Default Home:** Brisbane CBD (-27.4698, 153.0251) in properties.xml, mirrored in `HomeSettings.DEFAULT_LAT/LON` and tested. Applies to new installs only.
+- **Legacy dead zone removed:** only the exact old preset text ("-27.3705", "152.8691") counts as "not set"; anything else, even nearby, is a real Home. README known issue removed.
+- **MENU menu** (`HomeMenu.mc`): Refresh, or Set Home here (shows the position, asks for confirmation, then `HomeHere.apply()` saves it as the Home settings to 5 decimals and fetches Home). Works on USB-installed copies, where Garmin Connect settings may be missing. New `WatchServices.setHomeSettings()`.
+- **Settings titles** in Garmin Connect now come from strings.xml, with examples and how to use GPS instead.
+- Tests: `setHomeHereSavesAndFetches`, `homeHereFormats`, `defaultHomeIsSet`; `homeStatusDefaultsAreNotSet` updated for the exact-match rule.

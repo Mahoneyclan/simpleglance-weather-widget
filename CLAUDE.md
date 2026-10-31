@@ -26,6 +26,7 @@ monkeydo <outside-repo>/test.prg fenix6pro -t   # must end PASSED
 
 - Three processes (widget, glance, background) share nothing but `Application.Storage`. Mark code needed by the glance or background with `(:glance)` / `(:background)`, and only that code: those processes have tight memory limits.
 - All web requests are built in `WeatherRequests.mc` and all replies parsed in `WeatherParser.mc`, both shared by the widget and the background. Test parser changes against the recorded reply in `source/test/WeatherParserTest.mc`. Refer to array positions with `WeatherSlots` constants, not numbers, and to Storage keys with `WeatherState` constants where one exists.
+- WeatherData and PlaceNames reach the watch only through `WatchServices` (Storage, settings, clock, requests, GPS, timer, redraw); test changes to them in `source/test/WeatherDataTest.mc` with `FakeWatch`. BackgroundService does not use it (background memory).
 - Fetch timing and place-name reuse rules live in `FetchRules.mc` and take raw values as parameters, so they stay testable. Type checks of untrusted values use `Values.mc`.
 - The glance process can run `WeatherApp.onSettingsChanged()` and `onBackgroundData()`, so everything they call must be marked `:glance` too. Keep `:glance` modules small (no parser, no bitmaps).
 - On release, bump the version in both `manifest.xml` and `RequestHeaders.USER_AGENT`.
@@ -34,6 +35,8 @@ monkeydo <outside-repo>/test.prg fenix6pro -t   # must end PASSED
 - HTTPS only. No API keys or tokens in source.
 - Every coordinate sent off the watch goes through `Coordinates.forRequest()` (about 1 km precision). Update PRIVACY.md if what is sent changes.
 - No `System.println` of coordinates or responses in release code.
+- (deliberate) No in-app "Delete all my data": all data stays on the watch, and removing the widget deletes it (PRIVACY.md says so). Decided by the owner 2026-10-31.
+- Show values in the watch's units through `Units.mc`; store metric only. UI words go in `strings.xml`, and anything the glance draws needs `scope="glance"`.
 
 ## Documentation rules
 

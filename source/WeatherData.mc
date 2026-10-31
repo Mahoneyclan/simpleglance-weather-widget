@@ -1,17 +1,11 @@
-// WeatherData.mc — the full-screen widget's weather data for both locations:
-// loading the cache, finding the GPS position, fetching, retrying and saving.
-// Runs in the foreground (widget) process only; WeatherView draws what it holds.
-//
-// Storage keys written here: gps_coords, gps_weather, gps_forecast,
-// home_weather, home_forecast, gps_fetch_time, home_fetch_time, home_fetch_for.
-// Place names are handled by PlaceNames.mc.
+// WeatherData.mc — the widget's weather for both locations: cache, GPS position,
+// fetching, retries and saving. Widget process only. Storage keys written: gps_coords
+// and gps_/home_ weather, forecast, fetch_time, fetch_for (names: PlaceNames.mc).
+// All watch access goes through WatchServices, so tests can replace it.
 
 import Toybox.Application;
 import Toybox.Lang;
 import Toybox.Position;
-import Toybox.Time;
-import Toybox.Timer;
-import Toybox.WatchUi;
 
 //! Holds, fetches and caches the weather for both locations.
 class WeatherData {
@@ -35,16 +29,18 @@ class WeatherData {
     private var gpsCoords as Array<Double>? = null;
     //! Set while a one-shot GPS request is pending, so refresh() does not start a second one.
     private var gpsRequested as Boolean = false;
-    //! One-shot timer for GPS weather retries.
-    private var retryTimer as Timer.Timer = new Timer.Timer();
+    //! Storage, settings, clock, requests, GPS, timer and redraws.
+    private var watch as WatchServices;
     //! Retries left in this refresh.
     private var retriesLeft as Number = 0;
-    //! "home_fetch_for" record of the Home request in flight, saved if it succeeds.
-    private var homeRequestedFor as Array<Application.PropertyValueType> = [] as Array<Application.PropertyValueType>;
+    //! Fetch-for record (FetchRules.fetchRecord()) of each slot's request in flight, saved with its reply.
+    private var requestedFor as Array<Array> = [[], []] as Array<Array>;
 
     //! Creates an empty holder; call loadCache() before drawing.
-    function initialize() {
-        places = new PlaceNames(method(:rename));
+    //! @param services The watch services (a test double in unit tests).
+    function initialize(services as WatchServices) {
+        watch = services;
+        places = new PlaceNames(services, method(:rename));
     }
 
     // MARK: - Reading
@@ -60,6 +56,9 @@ class WeatherData {
     //! @return true if the Home settings are filled in but unusable.
     function homeInvalid() as Boolean { return homeStatus == HomeSettings.STATUS_INVALID; }
 
+    //! @return The best known GPS position [latitude, longitude], or null.
+    function position() as Array<Double>? { return gpsCoords; }
+
     //! @param slot WeatherState.GPS or WeatherState.HOME.
     //! @return true if the latest attempt for the data shown in this slot failed.
     function lastAttemptFailed(slot as Number) as Boolean { return failed[source(slot)]; }
@@ -74,15 +73,13 @@ class WeatherData {
     //! @param slot WeatherState.GPS or WeatherState.HOME.
     //! @return Unix time of the last successful update of the slot's data, or null if unknown.
     function fetchTime(slot as Number) as Number? {
-        var raw = Storage.getValue(WeatherState.FETCH_TIME_KEYS[source(slot)] as String);
+        var raw = watch.getValue(WeatherState.FETCH_TIME_KEYS[source(slot)] as String);
         return Values.isNumeric(raw) ? Values.toNumberOr(raw, 0) : null;
     }
 
     //! @param slot WeatherState.GPS or WeatherState.HOME.
     //! @return The slot whose fetches fill it (WeatherState.source()).
-    private function source(slot as Number) as Number {
-        return WeatherState.source(slot, homeStatus == HomeSettings.STATUS_SET);
-    }
+    private function source(slot as Number) as Number { return WeatherState.source(slot, homeStatus == HomeSettings.STATUS_SET); }
 
     // MARK: - Cache
 
@@ -91,32 +88,33 @@ class WeatherData {
     //! Security: cached data may come from an older app version or be damaged, so
     //! it is shape-checked and anything unexpected is treated as "no data".
     function loadCache() as Void {
-        homeStatus = HomeSettings.status();
+        homeStatus = watch.homeStatus();
         for (var slot = 0; slot < 2; slot++) {
-            var cur = Storage.getValue(WeatherState.WEATHER_KEYS[slot] as String);
-            var fc  = Storage.getValue(WeatherState.FORECAST_KEYS[slot] as String);
+            var cur = watch.getValue(WeatherState.WEATHER_KEYS[slot] as String);
+            var fc  = watch.getValue(WeatherState.FORECAST_KEYS[slot] as String);
             current[slot]  = WeatherParser.isValidCurrent(cur) ? cur as Array : null;
             forecast[slot] = WeatherParser.isValidForecast(fc) ? fc as Array : null;
             if (current[slot] != null) {
                 places.setCached(slot, (current[slot] as Array)[WeatherSlots.CUR_NAME] as String);
             }
         }
-        gpsCoords = Coordinates.validOrNull(Storage.getValue("gps_coords"));
+        gpsCoords = Coordinates.validOrNull(watch.getValue("gps_coords"));
     }
 
-    //! Saves a successful weather reply for a slot and records the time.
+    //! Saves a successful weather reply for a slot with its time and place.
     //! Side effects: Storage writes; clears the slot's failure flag.
     //! @param slot WeatherState.GPS or WeatherState.HOME.
     //! @param cur Parsed current conditions.
     //! @param fc Parsed forecast, or null to keep the previous one.
     private function store(slot as Number, cur as Array, fc as Array?) as Void {
         current[slot] = cur;
-        Storage.setValue(WeatherState.WEATHER_KEYS[slot] as String, cur as Array<Application.PropertyValueType>);
+        watch.setValue(WeatherState.WEATHER_KEYS[slot] as String, cur as Array<Application.PropertyValueType>);
         if (fc != null) {
             forecast[slot] = fc;
-            Storage.setValue(WeatherState.FORECAST_KEYS[slot] as String, fc as Array<Application.PropertyValueType>);
+            watch.setValue(WeatherState.FORECAST_KEYS[slot] as String, fc as Array<Application.PropertyValueType>);
         }
-        Storage.setValue(WeatherState.FETCH_TIME_KEYS[slot] as String, Time.now().value());
+        watch.setValue(WeatherState.FETCH_TIME_KEYS[slot] as String, watch.now());
+        watch.setValue(WeatherState.FETCH_FOR_KEYS[slot] as String, requestedFor[slot] as Array<Application.PropertyValueType>);
         failed[slot] = false;
     }
 
@@ -131,11 +129,11 @@ class WeatherData {
         var fc = forecast[WeatherState.GPS];
         current[WeatherState.HOME]  = cur.slice(0, null);
         forecast[WeatherState.HOME] = (fc != null) ? fc.slice(0, null) : null;
-        Storage.setValue(WeatherState.WEATHER_KEYS[WeatherState.HOME] as String,
+        watch.setValue(WeatherState.WEATHER_KEYS[WeatherState.HOME] as String,
             current[WeatherState.HOME] as Array<Application.PropertyValueType>);
-        Storage.deleteValue(WeatherState.HOME_FETCH_FOR_KEY);
+        watch.deleteValue(WeatherState.FETCH_FOR_KEYS[WeatherState.HOME] as String);
         if (fc != null) {
-            Storage.setValue(WeatherState.FORECAST_KEYS[WeatherState.HOME] as String,
+            watch.setValue(WeatherState.FORECAST_KEYS[WeatherState.HOME] as String,
                 forecast[WeatherState.HOME] as Array<Application.PropertyValueType>);
         }
     }
@@ -150,32 +148,33 @@ class WeatherData {
         var fc  = forecast[slot];
         if (cur != null) {
             cur[WeatherSlots.CUR_NAME] = name;
-            Storage.setValue(WeatherState.WEATHER_KEYS[slot] as String, cur as Array<Application.PropertyValueType>);
+            watch.setValue(WeatherState.WEATHER_KEYS[slot] as String, cur as Array<Application.PropertyValueType>);
         }
         if (fc != null) {
             fc[WeatherSlots.FC_NAME] = name;
-            Storage.setValue(WeatherState.FORECAST_KEYS[slot] as String, fc as Array<Application.PropertyValueType>);
+            watch.setValue(WeatherState.FORECAST_KEYS[slot] as String, fc as Array<Application.PropertyValueType>);
         }
         if (slot == WeatherState.GPS && homeStatus != HomeSettings.STATUS_SET) { mirrorGps(); }
-        WatchUi.requestUpdate();
+        watch.redraw();
     }
 
     // MARK: - Fetching
 
-    //! Fetches each location whose data is missing or older than the refresh
-    //! interval; fresh data is not fetched again, to save battery and radio use.
-    //! Called on start and by the MENU button. A pending retry is cancelled, so
-    //! MENU during a retry wait does not send the GPS request twice.
-    //! Side effects: up to four web requests, or a one-shot GPS request.
+    //! Fetches each location whose data is missing, older than the refresh interval,
+    //! or for another place (FetchRules.needsFetch()); fresh data for the same place
+    //! is not fetched again, to save battery and radio use. Called on start and by
+    //! MENU. A pending retry is cancelled, so MENU cannot send the GPS request twice.
+    //! Side effects: up to four web requests and possibly a one-shot GPS request.
     function refresh() as Void {
-        retryTimer.stop();
-        homeStatus = HomeSettings.status();
+        watch.stopRetry();
+        homeStatus = watch.homeStatus();
         retriesLeft = MAX_RETRIES;
         if (homeStatus == HomeSettings.STATUS_SET) {
             if (needsFetch(WeatherState.HOME)) { fetchHome(); }
         } else {
             mirrorGps();
         }
+        locate();
         if (needsFetch(WeatherState.GPS)) { fetchGps(); }
     }
 
@@ -183,53 +182,55 @@ class WeatherData {
     //! the data shown is still fresh, because it may be for the old Home.
     //! Side effects: deletes "home_fetch_time"; see refresh().
     function settingsChanged() as Void {
-        Storage.deleteValue(WeatherState.FETCH_TIME_KEYS[WeatherState.HOME] as String);
+        watch.deleteValue(WeatherState.FETCH_TIME_KEYS[WeatherState.HOME] as String);
         failed[WeatherState.HOME] = false;
         refresh();
     }
 
     //! Stops the retry timer while the widget is off screen.
-    function stop() as Void {
-        retryTimer.stop();
-    }
+    function stop() as Void { watch.stopRetry(); }
 
     //! @param slot WeatherState.GPS or WeatherState.HOME.
     //! @return true if the slot has no data, it is older than the refresh interval,
-    //!   or (Home) it was not fetched for the current Home setting.
+    //!   or it was fetched for another place (the watch moved, or Home changed).
     private function needsFetch(slot as Number) as Boolean {
-        if (current[slot] == null) { return true; }
-        if (slot == WeatherState.HOME && !FetchRules.fetchedForHome(HomeSettings.lat(), HomeSettings.lon(),
-                Storage.getValue(WeatherState.HOME_FETCH_FOR_KEY))) { return true; }
-        var minutes = FetchRules.refreshMinutes(Properties.getValue("refresh_rate"));
-        return !FetchRules.isFresh(Storage.getValue(WeatherState.FETCH_TIME_KEYS[slot] as String),
-                                   Time.now().value(), minutes);
+        var at = (slot == WeatherState.HOME) ? watch.homeCoords() as Array : gpsCoords;
+        var forCurrentPlace = at != null
+            && FetchRules.fetchedFor(at[0] as Numeric, at[1] as Numeric, watch.getValue(WeatherState.FETCH_FOR_KEYS[slot] as String));
+        return FetchRules.needsFetch(current[slot] != null,
+            watch.getValue(WeatherState.FETCH_TIME_KEYS[slot] as String), watch.now(),
+            FetchRules.refreshMinutes(watch.refreshSetting()), forCurrentPlace);
     }
 
     //! Fetches Home weather and, unless its saved place name still applies,
     //! its place name (PlaceNames.lookUp()).
     private function fetchHome() as Void {
-        var lat = HomeSettings.lat();
-        var lon = HomeSettings.lon();
-        homeRequestedFor = FetchRules.homeFetchRecord(lat, lon);
-        WeatherRequests.weather(lat, lon, method(:onHomeWeather));
+        var home = watch.homeCoords();
+        var lat = home[0];
+        var lon = home[1];
+        requestedFor[WeatherState.HOME] = FetchRules.fetchRecord(lat, lon);
+        watch.requestWeather(lat, lon, method(:onHomeWeather));
         places.lookUp(WeatherState.HOME, lat, lon);
     }
 
-    //! Fetches GPS weather and place name, or starts a one-shot GPS request when no
-    //! position is known. If a one-shot request is already pending, clears the flag
-    //! instead, so the next refresh can start a new one if that request never answers.
+    //! Updates gpsCoords with the best position (GpsPosition.choose()). Unless it
+    //! is a current fix, also asks for one; onPosition() refetches if the fix shows
+    //! a move. If a request is already pending, clears the flag instead, so the next
+    //! refresh can ask again if that request never answers.
+    private function locate() as Void {
+        var found = watch.findPosition();
+        if (found != null) { gpsCoords = [found[0], found[1]] as Array<Double>; }
+        if (found != null && found[GpsPosition.CURRENT] as Boolean) { return; }
+        gpsRequested = !gpsRequested;
+        if (gpsRequested) { watch.requestPosition(method(:onPosition)); }
+    }
+
+    //! Fetches GPS weather and, unless its saved name still applies, the place name.
     private function fetchGps() as Void {
-        var coords = GpsPosition.find();
-        if (coords != null) {
-            gpsCoords = coords;
-            requestGpsWeather();
-            places.lookUp(WeatherState.GPS, coords[0], coords[1]);
-        } else if (!gpsRequested) {
-            gpsRequested = true;
-            Position.enableLocationEvents(Position.LOCATION_ONE_SHOT, method(:onPosition));
-        } else {
-            gpsRequested = false;
-        }
+        var coords = gpsCoords;
+        if (coords == null) { return; }
+        requestGpsWeather();
+        places.lookUp(WeatherState.GPS, coords[0], coords[1]);
     }
 
     //! Requests GPS weather for gpsCoords. Also the retry timer's callback, so a
@@ -237,52 +238,53 @@ class WeatherData {
     function requestGpsWeather() as Void {
         var coords = gpsCoords;
         if (coords != null) {
-            WeatherRequests.weather(coords[0], coords[1], method(:onGpsWeather));
+            requestedFor[WeatherState.GPS] = Coordinates.rounded(coords);   // privacy: ~1 km
+            watch.requestWeather(coords[0], coords[1], method(:onGpsWeather));
         }
     }
 
     // MARK: - Callbacks
 
-    //! One-shot GPS callback. Saves the fix and fetches weather and place name for it.
+    //! One-shot GPS callback. Saves the fix, and fetches weather and place name for
+    //! it if the GPS data is missing, stale or for somewhere else (needsFetch()).
     //! @param info Position info from the system.
     function onPosition(info as Position.Info) as Void {
         gpsRequested = false;
         var pos = (info.position != null)
             ? Coordinates.validOrNull((info.position as Position.Location).toDegrees()) : null;
         if (pos != null) {
-            Storage.setValue("gps_coords", Coordinates.rounded(pos));
+            watch.setValue("gps_coords", Coordinates.rounded(pos));
             gpsCoords = pos;
-            requestGpsWeather();
-            places.lookUp(WeatherState.GPS, pos[0], pos[1]);
+            if (needsFetch(WeatherState.GPS)) { fetchGps(); }
         }
-        WatchUi.requestUpdate();
+        watch.redraw();
     }
 
     //! GPS weather callback. On success saves the data (and mirrors it to Home when
-    //! Home is not set). A network-level error (code <= 0) is retried after
-    //! RETRY_DELAY_MS, up to MAX_RETRIES times per refresh; any other failure, or
-    //! running out of retries, marks the slot as failed and keeps the old data.
+    //! Home is not set). FetchRules.gpsReplyAction() decides the rest: a network
+    //! error is retried after RETRY_DELAY_MS, up to MAX_RETRIES times per refresh;
+    //! otherwise the slot is marked as failed and the old data kept.
     //! @param responseCode HTTP status, or a negative Connect IQ error code.
     //! @param data Parsed JSON body, or null.
     function onGpsWeather(responseCode as Number, data as Dictionary?) as Void {
         var name = places.name(WeatherState.GPS);
         var cur = (responseCode == 200) ? WeatherParser.parseCurrent(data, name) : null;
-        if (cur != null) {
-            store(WeatherState.GPS, cur, WeatherParser.parseForecast(data, name, cur));
+        var action = FetchRules.gpsReplyAction(cur != null, responseCode, retriesLeft);
+        if (action == FetchRules.REPLY_SAVE) {
+            store(WeatherState.GPS, cur as Array, WeatherParser.parseForecast(data, name, cur));
             if (homeStatus != HomeSettings.STATUS_SET) { mirrorGps(); }
-        } else if (responseCode <= 0 && retriesLeft > 0) {
+        } else if (action == FetchRules.REPLY_RETRY) {
             retriesLeft--;
-            retryTimer.start(method(:requestGpsWeather), RETRY_DELAY_MS, false);
+            watch.startRetry(method(:requestGpsWeather), RETRY_DELAY_MS);
             return;
         } else {
             failed[WeatherState.GPS] = true;
         }
-        WatchUi.requestUpdate();
+        watch.redraw();
     }
 
-    //! Home weather callback. On success saves the data and the Home coordinates
-    //! it is for ("home_fetch_for"); otherwise marks Home as failed and keeps the
-    //! old data (no retry).
+    //! Home weather callback. On success saves the data (store()); otherwise marks
+    //! Home as failed and keeps the old data (no retry).
     //! @param responseCode HTTP status, or a negative Connect IQ error code.
     //! @param data Parsed JSON body, or null.
     function onHomeWeather(responseCode as Number, data as Dictionary?) as Void {
@@ -290,10 +292,9 @@ class WeatherData {
         var cur = (responseCode == 200) ? WeatherParser.parseCurrent(data, name) : null;
         if (cur != null) {
             store(WeatherState.HOME, cur, WeatherParser.parseForecast(data, name, cur));
-            Storage.setValue(WeatherState.HOME_FETCH_FOR_KEY, homeRequestedFor);
         } else {
             failed[WeatherState.HOME] = true;
         }
-        WatchUi.requestUpdate();
+        watch.redraw();
     }
 }

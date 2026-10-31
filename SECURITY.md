@@ -11,7 +11,7 @@ Status: current as of review round 4 (2026-10-31). Findings are tracked in `docs
 | Place name and the coordinates (rounded to ~1 km) it was looked up for, per location (`gps_place`, `home_place`) | Application.Storage | Avoids repeating the lookup |
 | Weather and forecast arrays, place names | Application.Storage | Instant display on launch and in the glance |
 | Time of the last successful update, per location (`gps_fetch_time`, `home_fetch_time`) | Application.Storage | Skips refetching fresh data |
-| Home coordinates the saved Home weather was fetched for (`home_fetch_for`) | Application.Storage | Fetches Home again after it changes, even while the widget was closed |
+| Coordinates each location's saved weather was fetched for (`gps_fetch_for` rounded to ~1 km, `home_fetch_for`) | Application.Storage | Fetches again after the watch moves or Home changes, even while the data is fresh |
 
 No account, name, email, device identifier or analytics are collected. Nothing leaves the watch except the requests below.
 
@@ -31,7 +31,7 @@ All requests go over HTTPS through the paired phone (Garmin Connect Mobile), whi
 - No logging (`System.println`) of locations or responses.
 - Coordinates sent to third parties are rounded to about 1 km in one place (`Coordinates.mc`).
 - Open-Meteo and Nominatim replies and cached weather are validated in `WeatherParser.mc` before use; place names must be text and are capped at 30 characters.
-- Positions from the system and from Storage are range-checked (`Coordinates.validOrNull()`); other saved values (`gps_fetch_time`, `home_fetch_time`, `gps_place`, `home_place`, `home_fetch_for`, the background result) are type-checked before use (`Values.mc`, `FetchRules.savedPlaceName()`, `FetchRules.fetchedForHome()`, `BackgroundResult.writes()`, `GlanceRules.isDrawable()`), and the refresh-interval setting is range-checked (`FetchRules.refreshMinutes()`).
+- Positions from the system and from Storage are range-checked (`Coordinates.validOrNull()`); other saved values (`gps_fetch_time`, `home_fetch_time`, `gps_place`, `home_place`, `gps_fetch_for`, `home_fetch_for`, the background result) are type-checked before use (`Values.mc`, `FetchRules.savedPlaceName()`, `FetchRules.fetchedFor()`, `BackgroundResult.writes()`, `GlanceRules.isDrawable()`), and the refresh-interval setting is range-checked (`FetchRules.refreshMinutes()`).
 - User-entered Home settings are validated (`HomeSettings.mc`) before use or sending: they must be numbers within latitude ±90 and longitude ±180.
 - Permissions are limited to Background (scheduled refresh), Communications (web requests) and Positioning (GPS).
 
@@ -41,13 +41,13 @@ All requests go over HTTPS through the paired phone (Garmin Connect Mobile), whi
 |---|---|
 | — | ~~High: `PRIVACY.md` omitted Nominatim and Home coordinates.~~ Fixed 2026-10-29 (B1): both services and both locations are now disclosed. No in-app consent step: the widget's purpose implies sending location to a weather service, and the policy discloses the place-name lookup. |
 | — | ~~Medium: coordinates were sent with ~11 m precision.~~ Fixed 2026-10-29 (B3): all outgoing coordinates go through `Coordinates.forRequest()` and are rounded to 2 dp (~1 km). Unit tested. |
-| Low | ~~Medium: the default Home coordinates were the developer's own location.~~ Reduced 2026-10-29 (B3): new installs start blank. The old values stay in `HomeSettings.mc` as a "not set" marker for existing installs, and remain in git history and released builds. The owner chose not to rewrite history. |
+| Low | ~~Medium: the default Home coordinates were the developer's own location.~~ Reduced 2026-10-29 (B3): new installs no longer get the developer's location (since 2026-10-31 they start with Brisbane CBD, a public place). The old values stay in `HomeSettings.mc` as a "not set" marker for existing installs, and remain in git history and released builds. The owner chose not to rewrite history. |
 | — | ~~Medium: Home settings were not validated.~~ Fixed 2026-10-29 (B2): `HomeSettings.mc` rejects non-numeric, out-of-range and half-filled values. Nothing is fetched for them, and the user sees "Check Home settings". Unit tested. |
 | — | ~~Medium: Open-Meteo replies were used without checks.~~ Fixed 2026-10-29 (B4): `WeatherParser.mc` type- and length-checks every field, and malformed replies are ignored (previous data kept). Cached Storage arrays are shape-checked before drawing, in both widget and glance. Tested against a recorded real reply and damaged copies. |
 | — | ~~Medium (F6): weather icons are GPL-3.0 while the app was "All rights reserved".~~ Fixed 2026-10-31 (round 4): the owner chose to release the app under GPL-3.0 (`LICENSE`); README credits the icons. The source is public on GitHub. |
 | Low | Stale `.iq` tracked in git: removal is staged (B5) but takes effect only when the owner commits; it stays in history. |
 | — | ~~Low: Nominatim politeness.~~ Fixed (B5, round 4): widget and background reuse a saved place name until the location moves about 1 km; User-Agent has version and contact (`RequestHeaders.mc`). |
-| Low | The last GPS position is kept until the widget is removed (now rounded to ~1 km, B5); there is no "clear data" option. |
+| Low (accepted) | The last GPS position is kept until the widget is removed (rounded to ~1 km, B5). There is deliberately no in-app "Delete all my data": all data is on the watch only and removing the widget deletes it (owner decision 2026-10-31, recorded in CLAUDE.md). |
 | — | ~~Low: `.gitignore` gaps.~~ Fixed (B5): `*.der`, `*.pem`, `*.p12`, `.claude/settings.local.json` added. |
 | — | ~~Low (N1/N2, round 2): Nominatim replies and some saved values were not type-checked.~~ Fixed 2026-10-30 (B6), with unit tests. |
 | — | ~~Low (F11): HTTP errors were ignored silently.~~ Fixed 2026-10-30 (round 3): a failed refresh shows "No connection · <data time>", or "No connection. Press MENU to retry." when there is no data. |

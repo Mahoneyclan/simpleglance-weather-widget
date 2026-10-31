@@ -56,6 +56,39 @@ module FetchRules {
         return age >= 0 && age < minutes * 60;
     }
 
+    //! Whether a location's weather should be fetched again.
+    //! @param hasData true if the location has weather to show.
+    //! @param lastFetch The raw Storage value of its fetch time (see isFresh()).
+    //! @param now The current Unix time.
+    //! @param minutes The refresh interval from refreshMinutes().
+    //! @param forCurrentPlace true if the data is for the location as it is now set
+    //!   (always true for GPS; fetchedFor() for Home).
+    //! @return true if there is no data, it is for another place, or it is stale.
+    function needsFetch(hasData as Boolean, lastFetch as Object?, now as Number, minutes as Number,
+                        forCurrentPlace as Boolean) as Boolean {
+        return !hasData || !forCurrentPlace || !isFresh(lastFetch, now, minutes);
+    }
+
+    //! gpsReplyAction(): the reply was parsed; save it.
+    const REPLY_SAVE = 0;
+    //! gpsReplyAction(): network error with retries left; try again after a pause.
+    const REPLY_RETRY = 1;
+    //! gpsReplyAction(): give up; keep the old data and show "No connection".
+    const REPLY_FAILED = 2;
+
+    //! What to do with a GPS weather reply. Only network-level errors (code <= 0,
+    //! for example no phone connection) are retried: an HTTP error or a damaged
+    //! reply would most likely fail the same way again.
+    //! @param parsed true if the reply was a 200 and parsed into weather.
+    //! @param responseCode HTTP status, or a negative Connect IQ error code.
+    //! @param retriesLeft Retries left in this refresh.
+    //! @return REPLY_SAVE, REPLY_RETRY or REPLY_FAILED.
+    function gpsReplyAction(parsed as Boolean, responseCode as Number, retriesLeft as Number) as Number {
+        if (parsed) { return REPLY_SAVE; }
+        if (responseCode <= 0 && retriesLeft > 0) { return REPLY_RETRY; }
+        return REPLY_FAILED;
+    }
+
     //! Builds the record saved as "gps_place" / "home_place" after a successful
     //! place-name lookup. It keeps the name apart from the weather arrays, because
     //! the Home weather array holds a copy of the GPS data while Home is not set.
@@ -80,24 +113,26 @@ module FetchRules {
         return (a != null && isNear(lat, lon, a)) ? Values.nonEmptyString(a[2]) : null;
     }
 
-    //! Builds the "home_fetch_for" record saved with each Home weather result.
-    //! @param lat Home latitude the weather was requested for.
-    //! @param lon Home longitude the weather was requested for.
+    //! Builds the "gps_fetch_for" / "home_fetch_for" record saved with each
+    //! weather result.
+    //! @param lat Latitude the weather was requested for.
+    //! @param lon Longitude the weather was requested for.
     //! @return [latitude, longitude], typed for Storage.setValue().
-    function homeFetchRecord(lat as Numeric, lon as Numeric) as Array<Application.PropertyValueType> {
+    function fetchRecord(lat as Numeric, lon as Numeric) as Array<Application.PropertyValueType> {
         return [lat.toFloat(), lon.toFloat()] as Array<Application.PropertyValueType>;
     }
 
-    //! Whether the saved Home weather was fetched for the current Home setting.
-    //! Settings changed while the widget is closed reach no settingsChanged()
-    //! call, and the data may still be fresh, so the widget checks this too.
-    //! A copy of the GPS data saves an empty record and never matches.
+    //! Whether saved weather was fetched for the current position: within about
+    //! 1 km of the watch (GPS), or of the Home setting (Home). Fresh data for
+    //! somewhere else is fetched again: the watch has moved, or Home was changed
+    //! while the widget was closed (no settingsChanged() call reaches it then).
+    //! A copy of the GPS data saves an empty Home record and never matches.
     //! Security: the record comes from Storage, so its shape and types are checked.
-    //! @param lat Current Home latitude (HomeSettings.lat()).
-    //! @param lon Current Home longitude (HomeSettings.lon()).
-    //! @param saved Raw Storage value of "home_fetch_for" (see homeFetchRecord()).
+    //! @param lat Current latitude of the slot.
+    //! @param lon Current longitude of the slot.
+    //! @param saved Raw Storage value of "gps_fetch_for" / "home_fetch_for" (see fetchRecord()).
     //! @return true if the record is within PLACE_TOLERANCE of (lat, lon) on both axes.
-    function fetchedForHome(lat as Numeric, lon as Numeric, saved as Object?) as Boolean {
+    function fetchedFor(lat as Numeric, lon as Numeric, saved as Object?) as Boolean {
         var a = Values.arrayOrNull(saved, 2);
         return a != null && isNear(lat, lon, a);
     }

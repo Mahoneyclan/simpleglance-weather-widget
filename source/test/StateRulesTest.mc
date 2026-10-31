@@ -36,7 +36,7 @@ function backgroundResultWritesAll(logger as Logger) as Boolean {
     var gpsFc = [3];
     var homeFc = [4];
     var place = FetchRules.placeRecord(-27.47f, 153.02f, "Brisbane City");
-    var fetchFor = FetchRules.homeFetchRecord(-27.47f, 153.02f);
+    var fetchFor = FetchRules.fetchRecord(-27.47f, 153.02f);
     var w = BackgroundResult.writes(BackgroundResult.build(gps, home, gpsFc, homeFc, place, fetchFor), 1000);
     Test.assertEqual(w.size(), 8);
     Test.assert(w["home_fetch_for"] == fetchFor);

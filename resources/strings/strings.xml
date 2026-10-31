@@ -8,4 +8,45 @@
     <string id="CheckHome">Check Home\nsettings in\nGarmin Connect</string>
     <!-- Bottom status line when the shown data could not be refreshed; " · 14:05" (the data time) is appended when known. -->
     <string id="Offline">No connection</string>
+
+    <!-- Current-conditions page. -->
+    <string id="Rain">RAIN</string>
+    <string id="Wind">WIND</string>
+    <string id="Feels">Feels</string>
+    <string id="Chance">chance</string>
+    <string id="Gust">gust</string>
+    <string id="High">H:</string>
+    <string id="Low">L:</string>
+
+    <!-- Forecast pages: the first hour and the first day. -->
+    <string id="Now">Now</string>
+    <string id="Today">Today</string>
+
+    <!-- MENU menu (HomeMenu.mc). -->
+    <string id="MenuRefresh">Refresh</string>
+    <string id="MenuSetHome">Set Home here</string>
+    <string id="NoPositionYet">No GPS position yet</string>
+    <string id="ConfirmSetHome">Set Home to\nthis location?</string>
+
+    <!-- Garmin Connect settings titles. -->
+    <string id="SettingRefresh">Background refresh interval</string>
+    <string id="SettingHomeLat">Home latitude (e.g. -27.4698). Clear both to use GPS.</string>
+    <string id="SettingHomeLon">Home longitude (e.g. 153.0251). Or use MENU, Set Home here.</string>
+
+    <!-- Units, chosen from the watch's unit settings (Units.mc). -->
+    <string id="UnitCelsius">°C</string>
+    <string id="UnitFahrenheit">°F</string>
+    <string id="UnitKmh">km/h</string>
+    <string id="UnitMph">mph</string>
+    <string id="UnitMm">mm</string>
+    <string id="UnitInch">in</string>
+
+    <!-- Glance condition words, so the condition is not shown by colour alone. -->
+    <string id="CondClear" scope="glance">Clear</string>
+    <string id="CondCloudy" scope="glance">Cloudy</string>
+    <string id="CondFog" scope="glance">Fog</string>
+    <string id="CondRain" scope="glance">Rain</string>
+    <string id="CondSnow" scope="glance">Snow</string>
+    <string id="CondShowers" scope="glance">Showers</string>
+    <string id="CondStorm" scope="glance">Storm</string>
 </strings>
