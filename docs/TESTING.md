@@ -124,6 +124,15 @@ settings file from the simulator (see "Home settings without the store" below).
    shortest setting) with the phone connected. **Expect:** the glance
    temperature or condition updates without opening the widget.
 
+## Store beta
+
+The Connect IQ store cannot add the public app's ID as a second app, so the
+private beta ("SimpleGlance Beta") is a separate app with its own ID:
+`57f89d18-a1d4-4453-9785-66ddd41e4651`. Build it from a copy of the repo with
+that ID in `manifest.xml` and AppName "SimpleGlance Beta" in strings.xml, so
+the repo keeps the public ID. Reuse the same ID for every beta update, or the
+store creates another app.
+
 ## Home settings without the store
 
 1. Start the simulator, run the widget (`monkeydo bin/SGWEATHR.prg fenix6pro`)

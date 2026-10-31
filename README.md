@@ -47,7 +47,19 @@ The two dots at the bottom of every page show the active location: left dot = GP
 
 New installs start with Brisbane CBD as Home; updates keep whatever the watch already holds. While both values are blank, Home is not set and the Home page mirrors your GPS location. (Versions before 1.5.0 shipped preset coordinates; watches that still hold exactly that preset are also treated as "not set". Any other value, even nearby, counts as a real Home.) If a value is not a number, is out of range (latitude −90…90, longitude −180…180), or only one of the two is filled in, the Home page shows **Check Home settings in Garmin Connect** and no Home weather is fetched until it is fixed.
 
-The quickest way to set Home is on the watch: press MENU, choose **Set Home here**, and confirm. Or change settings via the **Garmin Connect app** on your phone → My Device → Apps & Widgets → SimpleGlance Weather Widget.
+## Setting Home
+
+**Use where you are now (on the watch, no typing):**
+1. Stand at the place you want as Home and open the widget.
+2. Press MENU (on most Fenix models, hold UP). The **Set Home here** line shows the position it will save, or "No GPS position yet" (step outside and wait for a fix).
+3. Choose **Set Home here**, then **Yes**. The Home page opens with that place's weather, and the Garmin Connect app shows the new coordinates.
+
+**Type coordinates (on the phone):**
+1. In the **Garmin Connect app**: My Device → Apps & Widgets → SimpleGlance Weather Widget → Settings.
+2. Enter Home Latitude and Home Longitude in decimal degrees. To find them, long-press the place in Google Maps or Apple Maps and copy the numbers it shows.
+3. Save. The watch picks up the change within a few seconds.
+
+To make Home follow you instead, clear both values; the Home page then mirrors your GPS location.
 
 ## Architecture
 
