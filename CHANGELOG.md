@@ -14,6 +14,7 @@
 - MENU opens a menu: Refresh, or **Set Home here**, which saves your current position as Home after a confirmation, no typing needed.
 - A Home near the coordinates older versions shipped now works; only the exact old preset counts as "not set".
 - Clearer setting titles in Garmin Connect, with examples.
+- Place names: a district such as "Samford Valley" is shown instead of the whole city ("Brisbane").
 - New installs start with Brisbane CBD as Home (clear both Home settings to mirror GPS instead).
 - Follows the watch's units (°C/°F, km/h/mph, mm/inches) and 12/24-hour time.
 - Hour and day headings come from when the data was fetched, so old data is never labelled "Now" or "Today".

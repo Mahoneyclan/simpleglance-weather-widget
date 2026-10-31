@@ -208,6 +208,13 @@ function placeNamePicksMostSpecific(logger as Logger) as Boolean {
     Test.assertEqual(WeatherParser.parsePlaceName(reply), "Surry Hills");
     Test.assertEqual(WeatherParser.parsePlaceName({ "address" => { "town" => "Bowral" } }), "Bowral");
     Test.assertEqual(WeatherParser.parsePlaceName({ "display_name" => "Lord Howe Island, NSW" }), "Lord Howe Island");
+    // Real Nominatim reply for (-27.37, 152.89), recorded 2026-10-31: no suburb,
+    // so the district must win over the city ("Brisbane").
+    var samford = { "address" => { "city_district" => "Samford Valley", "city" => "Brisbane",
+                                    "state" => "Queensland", "country" => "Australia" },
+                    "display_name" => "Samford Valley, Brisbane, Queensland, Australia" };
+    Test.assertEqual(WeatherParser.parsePlaceName(samford), "Samford Valley");
+    Test.assertEqual(WeatherParser.parsePlaceName({ "address" => { "village" => "Dayboro", "city" => "Moreton Bay" } }), "Dayboro");
     return true;
 }
 

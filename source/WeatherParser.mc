@@ -194,8 +194,11 @@ module WeatherParser {
     const MAX_NAME_LENGTH = 30;
 
     //! Picks the most specific place name from a Nominatim reverse-geocoding reply:
-    //! the "suburb", "town", "city", "village" or "hamlet" address field, else the first comma-separated
-    //! part of display_name. Only non-empty Strings are accepted (security: the reply
+    //! the first of the "suburb", "city_district", "town", "village", "hamlet" and
+    //! "city" address fields, else the first comma-separated part of display_name.
+    //! "city" comes last because in a big council area it is the whole city: for
+    //! Samford Valley, Nominatim gives city_district "Samford Valley" and city
+    //! "Brisbane" (reply checked 2026-10-31). Only non-empty Strings are accepted (security: the reply
     //! is untrusted), and the result is cut to MAX_NAME_LENGTH characters.
     //! @param data Parsed JSON body of a 200 response, or null.
     //! @return The name, or null if none is usable.
@@ -205,7 +208,7 @@ module WeatherParser {
         var addr = data["address"];
         if (addr instanceof Dictionary) {
             var a = addr as Dictionary<String, Object?>;
-            var keys = ["suburb", "town", "city", "village", "hamlet"];
+            var keys = ["suburb", "city_district", "town", "village", "hamlet", "city"];
             for (var i = 0; i < keys.size() && name == null; i++) {
                 name = Values.nonEmptyString(a[keys[i] as String]);
             }
