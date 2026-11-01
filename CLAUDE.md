@@ -32,7 +32,6 @@ monkeydo <outside-repo>/test.prg fenix6pro -t   # must end PASSED
 - On release, bump the version in both `manifest.xml` and `RequestHeaders.USER_AGENT`.
 - Storage keys and property IDs are permanent (installed watches hold them). Add new ones; never rename.
 - Treat every web response, Storage value and setting as untrusted: check for null and type before use. Home settings are read only through `HomeSettings`.
-- HTTPS only. No API keys or tokens in source.
 - Every coordinate sent off the watch goes through `Coordinates.forRequest()` (about 1 km precision). Update PRIVACY.md if what is sent changes.
 - No `System.println` of coordinates or responses in release code.
 - (deliberate) No in-app "Delete all my data": all data stays on the watch, and removing the widget deletes it (PRIVACY.md says so). Decided by the owner 2026-10-31.
